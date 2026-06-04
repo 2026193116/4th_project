@@ -1,10 +1,3 @@
-"""
-Level 4 클리어 시뮬레이션 파일
-- 이 파일은 main.py와 독립적으로 실행됨
-- level 4의 클리어 메커니즘을 테스트하기 위한 파일
-- 단어 풀에서 문장 하나만 입력하면 바로 클리어 화면으로 넘어감
-"""
-
 import pygame
 import sys
 import os
