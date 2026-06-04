@@ -1,0 +1,65 @@
+"""video_player 모듈 테스트"""
+
+import io
+import os
+import sys
+import tempfile
+import types
+import unittest
+import contextlib
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from video_player import _can_play_with_opencv, _can_use_pygame, play_video
+import video_player
+
+
+class TestVideoPlayer(unittest.TestCase):
+    def test_can_play_with_opencv_returns_false_when_missing(self):
+        self.assertFalse(_can_play_with_opencv())
+
+    def test_can_use_pygame_returns_false_when_missing(self):
+        self.assertFalse(_can_use_pygame())
+
+    def test_play_video_missing_file_prints_message(self):
+        missing_path = os.path.join(os.path.dirname(__file__), 'nonexistent_video.mp4')
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            play_video(None, missing_path)
+        self.assertIn('파일을 찾을 수 없습니다', buffer.getvalue())
+
+    def test_play_video_falls_back_to_system_player(self):
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            original_can_opencv = video_player._can_play_with_opencv
+            original_can_pygame = video_player._can_use_pygame
+            original_run = video_player.subprocess.run
+            original_platform = video_player.sys.platform
+
+            video_player._can_play_with_opencv = lambda: False
+            video_player._can_use_pygame = lambda: False
+
+            called = []
+
+            def fake_run(command, shell=False):
+                called.append((command, shell))
+                return None
+
+            video_player.subprocess.run = fake_run
+            video_player.sys.platform = 'win32'
+
+            play_video(None, tmp_path)
+            self.assertTrue(called)
+            self.assertTrue('start' in called[0][0].lower())
+        finally:
+            video_player._can_play_with_opencv = original_can_opencv
+            video_player._can_use_pygame = original_can_pygame
+            video_player.subprocess.run = original_run
+            video_player.sys.platform = original_platform
+            os.unlink(tmp_path)
+
+
+if __name__ == '__main__':
+    unittest.main()

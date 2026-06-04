@@ -1,0 +1,83 @@
+"""renderer 모듈 테스트"""
+
+import os
+import sys
+import types
+import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+# pygame이 설치되지 않은 환경에서도 renderer를 테스트하기 위해 최소한의 더미 pygame 모듈을 삽입합니다.
+dummy_pygame = types.SimpleNamespace()
+
+class DummySurface:
+    def __init__(self, text, color):
+        self.text = text
+        self.color = color
+
+    def get_rect(self, **kwargs):
+        return kwargs
+
+
+class DummyFont:
+    def render(self, text, aa, color):
+        return DummySurface(text, color)
+
+dummy_pygame.font = types.SimpleNamespace(SysFont=lambda *args, **kwargs: DummyFont())
+
+draw_calls = []
+
+def dummy_rect(surface, color, rect, width=0):
+    draw_calls.append((surface, color, rect, width))
+
+dummy_pygame.draw = types.SimpleNamespace(rect=dummy_rect)
+dummy_pygame.display = types.SimpleNamespace(flip=lambda: None)
+dummy_pygame.Rect = lambda *args, **kwargs: tuple(args)
+dummy_pygame.error = Exception
+sys.modules['pygame'] = dummy_pygame
+
+from renderer import Renderer
+from entities import GameState, Word
+from config import RED
+
+
+class DummyScreen:
+    def __init__(self):
+        self.operations = []
+
+    def blit(self, surface, position):
+        self.operations.append(('blit', surface, position))
+
+    def fill(self, color):
+        self.operations.append(('fill', color))
+
+
+class TestRenderer(unittest.TestCase):
+    def setUp(self):
+        draw_calls.clear()
+        self.screen = DummyScreen()
+        self.renderer = Renderer(self.screen)
+
+    def test_draw_frame_does_not_raise(self):
+        state = GameState()
+        state.active_words.append(Word(text="TEST", x=100.0, base_y=100, amp=0, freq=1.0, speed=0.0, is_heavy=False))
+        state.current_input = "HELLO"
+        state.is_cooling_down = False
+        state.level_up_time = 0
+
+        self.renderer.draw_frame(state, mic_volume=10.0, is_shouting=False, current_time=0)
+
+        self.assertTrue(any(op[0] == 'fill' for op in self.screen.operations))
+        self.assertTrue(any(op[0] == 'blit' for op in self.screen.operations))
+
+    def test_draw_mic_bar_clamps_fill_width(self):
+        self.renderer._draw_mic_bar(mic_volume=300.0, is_shouting=True)
+
+        # fill_width가 바 너비를 넘지 않아야 합니다.
+        fill_rects = [call for call in draw_calls if call[1] == RED]
+        self.assertTrue(fill_rects)
+        self.assertEqual(fill_rects[0][2][2], 200)
+
+
+if __name__ == '__main__':
+    unittest.main()

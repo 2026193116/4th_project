@@ -1,0 +1,33 @@
+"""main 모듈 테스트"""
+
+import os
+import sys
+import types
+import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+original_pygame = sys.modules.get('pygame')
+dummy_pygame = types.SimpleNamespace()
+sys.modules['pygame'] = dummy_pygame
+
+try:
+    import main
+finally:
+    if original_pygame is None:
+        del sys.modules['pygame']
+    else:
+        sys.modules['pygame'] = original_pygame
+
+
+class TestMain(unittest.TestCase):
+    def test_get_level_video_known_level(self):
+        expected = os.path.join(main.ASSETS_DIR, 'level2.mp4')
+        self.assertEqual(main.get_level_video(2), expected)
+
+    def test_get_level_video_unknown_level(self):
+        self.assertEqual(main.get_level_video(999), os.path.join(main.ASSETS_DIR, ''))
+
+
+if __name__ == '__main__':
+    unittest.main()
